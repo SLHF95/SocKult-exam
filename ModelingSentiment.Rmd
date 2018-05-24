@@ -1,0 +1,162 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+getwd()
+locpath = getwd()
+setwd(locpath)
+
+library(pacman)
+p_load(tidyverse, tidytext, stringr, twitteR, magrittr, ggplot2, dplyr, rethinking, lme4, brms, broom)
+
+
+```
+
+```{r}
+
+ms1 <- brm(news_sent ~ 1,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+ms2 <- brm(news_sent ~ 1 + pre_dat_sent,
+           data = all2, family = gaussian(),
+           iter = 5000, warmup = 2000, cores = 4)
+
+ms3 <- brm(news_sent ~ 1 + pre_dat_sent + pre_news_sent,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+ms4 <- brm(news_sent ~ 1 + pre_dat_sent * pre_news_sent,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+ms5 <- brm(news_sent ~ 1 + pre_ent_sent,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+ms6 <- brm(news_sent ~ 1 + pre_ent_sent + pre_news_sent,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+ms7 <- brm(news_sent ~ 1 + pre_dat_sent * pre_news_sent,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+ms8 <- brm(news_sent ~ 1 + pre_news_sent,
+           data = all2, family = gaussian(),
+           iter = 2000, warmup = 1000, cores = 4)
+
+```
+
+```{r}
+plot(ms1)  
+plot(ms2)
+plot(ms3)
+plot(ms4)
+plot(ms5)
+plot(ms6)
+plot(ms7)
+plot(ms8)
+```
+
+```{r}
+#make other priors to see if gets better
+ms2prior = get_prior(news_sent ~ 1 + pre_dat_sent, 
+          data = all2, family = poisson)
+ms2prior
+
+mean(all2$news_sent, na.rm = TRUE)
+sd(all2$news_sent, na.rm = TRUE)
+mean(all2$pre_dat_sent, na.rm = TRUE)
+sd(all2$pre_dat_sent, na.rm = TRUE)
+
+ms2prior$prior[2] = "normal(-0.49,0.66)"
+ms2prior$prior[3] = "normal(-0.68, 0.25)"
+
+ms2p <- brm(news_sent ~ 1 + pre_dat_sent,
+           data = all2, family = gaussian(), prior = ms2prior,
+           iter = 5000, warmup = 2000, cores = 4)
+
+tidy(ms2)
+tidy(ms2p)
+
+```
+
+
+```{r}
+#add WAIC to the models
+ms1 <- add_ic(ms1, ic = c("waic"))
+ms2 <- add_ic(ms2, ic = c("waic"))
+ms3 <- add_ic(ms3, ic = c("waic"))
+ms4 <- add_ic(ms4, ic = c("waic"))
+ms5 <- add_ic(ms5, ic = c("waic"))
+ms6 <- add_ic(ms6, ic = c("waic"))
+ms7 <- add_ic(ms7, ic = c("waic"))
+ms8 <- add_ic(ms8, ic = c("waic"))
+
+```
+
+```{r}
+#calculate model weights to see which model is best
+model_weights(ms1, ms2, ms3, ms4, ms5, ms6, ms7, ms8, weights = "waic")
+
+```
+
+
+```{r}
+#show waic information
+ms1$waic[c("waic", "p_waic", "se_waic")]
+ms2$waic[c("waic", "p_waic", "se_waic")]
+ms3$waic[c("waic", "p_waic", "se_waic")]
+ms4$waic[c("waic", "p_waic", "se_waic")]
+ms5$waic[c("waic", "p_waic", "se_waic")]
+ms6$waic[c("waic", "p_waic", "se_waic")]
+ms7$waic[c("waic", "p_waic", "se_waic")]
+ms8$waic[c("waic", "p_waic", "se_waic")]
+
+```
+
+```{r}
+#precis plots of best model and next best model
+stanplot(m2, pars = "^b")
+stanplot(m1, pars = "^b")
+
+
+
+
+#posterior predictive plots
+pp_check(ms1, type = "dens_overlay")
+pp_check(ms2, type = "dens_overlay")
+pp_check(ms3, type = "dens_overlay")
+pp_check(ms4, type = "dens_overlay")
+pp_check(ms5, type = "dens_overlay")
+pp_check(ms6, type = "dens_overlay")
+pp_check(ms7, type = "dens_overlay")
+pp_check(ms8, type = "dens_overlay")
+
+
+```
+
+```{r}
+#summary of best and next best model
+
+#best
+summary(ms2)
+tidy(ms2) #using tidy to see all the decimals
+tidy(ms2)$estimate[2]
+tidy(ms2)$std.error[2]
+tidy(ms2)$lower[2]
+tidy(ms2)$upper[2]
+
+
+#next best
+summary(m1)
+tidy(m1)
+exp()
+```

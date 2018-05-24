@@ -1,0 +1,262 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+getwd()
+locpath = getwd()
+setwd(locpath)
+
+library(pacman)
+p_load(tidyverse, tidytext, stringr, twitteR, magrittr, ggplot2, dplyr, rethinking, lme4)
+p_load(brms, broom, brmstools)
+
+```
+
+```{r}
+
+#change format of date in news df
+news_df$date = as.character(news_df$date)
+news_df$date = as.Date(news_df$date, format = "%m%d") #in order for this to work, change the time on computer to 2017 xD
+
+#bind the dfs (rename first)
+colnames(dat_df)[2] = "dat_sent"
+colnames(dat_df)[3] = "dat_arou"
+colnames(dat_df)[5] = "dat_freq" 
+
+colnames(news_df)[2] = "news_sent"
+colnames(news_df)[3] = "news_arou"
+colnames(news_df)[5] = "news_freq"
+
+colnames(ent_df)[2] = "ent_sent"
+colnames(ent_df)[3] = "ent_arou"
+colnames(ent_df)[5] = "ent_freq" 
+
+all = merge(dat_df, news_df)
+all = merge(all, ent_df)
+
+#write csv file
+write.csv(all, file = "all.csv", row.names = F)
+
+
+#add columns to df with rate of tweets/article from day before (to avoid using lag) + sent
+freqs = subset(all, select = c(news_freq, dat_freq, ent_freq))
+sent = subset(all2, select = c(news_sent, dat_sent, ent_sent))
+
+x = c(NA, NA, NA)
+freqs = rbind(x, freqs)
+freqs = freqs[-33,]
+sent = rbind(x, sent)
+sent = sent[-33,]
+
+colnames(freqs)[1] = "pre_news_freq" 
+colnames(freqs)[2] = "pre_dat_freq" 
+colnames(freqs)[3] = "pre_ent_freq" 
+colnames(sent)[1] = "pre_news_sent" 
+colnames(sent)[2] = "pre_dat_sent" 
+colnames(sent)[3] = "pre_ent_sent" 
+
+
+all2 = cbind(all, freqs)
+all2 = cbind(all2, sent)
+
+write.csv(all2, file = "all2.csv", row.names = F)
+```
+
+```{r}
+
+
+
+m1 <- brm(news_freq ~ 1, # Outcome as a function of the predictors as in lme4. 
+               data=all, # Define the data
+               family = poisson(), # Define the family. 
+               iter = 5000, warmup = 2000, cores = 4)
+
+
+m2 <- brm(news_freq ~ 1 + pre_dat_freq,
+          data = all2,
+          family = poisson(),
+          iter = 5000, warmup = 2000, cores = 4)
+
+m3 <- brm(news_freq ~ 1 + pre_dat_freq + pre_news_freq, 
+         family = poisson(), data = all2,
+         iter = 5000, warmup = 2000, cores = 4, inits = 0)
+
+m4 <- brm(news_freq ~ 1 + pre_dat_freq * pre_news_freq, 
+         family = poisson(), data = all2,
+         iter = 5000, warmup = 2000, cores = 4, inits = 0)
+
+m5 <- brm(news_freq ~ 1 + pre_ent_freq, 
+               data=all2, 
+               family = poisson(), 
+               iter = 5000, warmup = 2000, cores = 4, inits = 0)
+
+m6 <- brm(news_freq ~ 1 + pre_ent_freq + pre_news_freq, 
+               data=all2, 
+               family = poisson(), 
+               iter = 5000, warmup = 2000, cores = 4, inits = 0)
+
+m7 <- brm(news_freq ~ 1 + pre_ent_freq * pre_news_freq,             #the chains look BAD so we need to fix this - book suggests priors
+               data=all2, 
+               family = poisson(), prior = m7prior, 
+               iter = 5000, warmup = 2000, cores = 4, inits = 0)
+
+m8 <- brm(news_freq ~ 1 + pre_news_freq,                            #m2 in report
+               data=all2, 
+               family = poisson(), 
+               iter = 5000, warmup = 2000, cores = 4, inits = 0)
+
+```
+
+```{r}
+#checking chains with trace plot
+plot(m1)
+plot(m2)
+plot(m3)
+plot(m4)
+plot(m5)
+plot(m6)
+plot(m7)
+plot(m8)
+#all fine except m7
+```
+
+```{r}
+#try to make other priors
+m2prior = get_prior(news_freq ~ 1 + pre_dat_freq, 
+          data = all2, family = poisson)
+m2prior
+
+mean(all2$news_freq, na.rm = TRUE)
+sd(all2$news_freq, na.rm = TRUE)
+mean(all2$pre_dat_freq, na.rm = TRUE)
+sd(all2$pre_dat_freq, na.rm = TRUE)
+
+m2prior$prior[2] = "normal(38,34)"
+m2prior$prior[3] = "normal(13, 6)"
+m2prior$prior[2] = "poisson(0:2, 38)" #bah
+
+m2p <- brm(news_freq ~ 1 + pre_dat_freq,
+          data = all2,
+          family = poisson(), prior = m2prior,
+          iter = 5000, warmup = 2000, cores = 4)
+
+tidy(m2)
+tidy(m2p)
+```
+
+
+```{r}
+#trying to fix m7
+m7prior = get_prior(news_freq ~ 1 + pre_ent_freq*pre_news_freq, 
+          data = all2, family = poisson)
+
+mean(all2$pre_news_freq, na.rm = TRUE)
+sd(all2$pre_news_freq, na.rm = TRUE)
+mean(all2$news_freq, na.rm = TRUE)
+sd(all2$news_freq, na.rm = TRUE)
+
+
+m7prior$prior[4] = "pois(0:2, 13)"  #tried with (13,10), (13,4), (15, 6), (13,40), (13,6), student_t(3,3,10)
+m7prior$prior[5] = "student_t(3, 3, 10)" #tried with (13,6). was worse so went back to default
+
+
+
+```
+
+
+```{r}
+#add WAIC to the models
+m1 <- add_ic(m1, ic = c("waic"))
+m2 <- add_ic(m2, ic = c("waic"))
+m3 <- add_ic(m3, ic = c("waic"))
+m4 <- add_ic(m4, ic = c("waic"))
+m5 <- add_ic(m5, ic = c("waic"))
+m6 <- add_ic(m6, ic = c("waic"))
+m7 <- add_ic(m7, ic = c("waic"))
+m8 <- add_ic(m8, ic = c("waic"))
+```
+
+```{r}
+#calculate model weights to see which model is best
+model_weights(m1, m2, m3, m4, m5, m6, m7, m8, weights = "waic")
+
+```
+
+```{r}
+#show waic information
+m1$waic[c("waic", "p_waic", "se_waic")]
+m2$waic[c("waic", "p_waic", "se_waic")]
+m3$waic[c("waic", "p_waic", "se_waic")]
+m4$waic[c("waic", "p_waic", "se_waic")]
+m5$waic[c("waic", "p_waic", "se_waic")]
+m6$waic[c("waic", "p_waic", "se_waic")]
+m7$waic[c("waic", "p_waic", "se_waic")]
+m8$waic[c("waic", "p_waic", "se_waic")]
+
+```
+
+```{r}
+#precis plots of best model and hypothesis model (not the same unfortunately :'( )
+stanplot(m4, pars = "^b")
+stanplot(m5, pars = "^b")
+
+
+
+
+#posterior predictive plots
+pp_check(m1, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m2, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m3, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m4, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m5, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m6, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m7, type = "rootogram", style = "hanging", prob = 0)
+pp_check(m8, type = "rootogram", style = "hanging", prob = 0)
+
+
+#the bars represent the difference between observed and predicted counts “hang” from the curve.
+#if a bar doesn't reach the 0 line, then the model overpredicts a particular count bin
+#if af bar exceeds the 0 line, it underpredicts a particular count bin
+
+```
+
+
+```{r}
+#summary of best model and hypothesis model 
+
+#best
+summary(m4)
+tidy(m4) #using tidy to see all the decimals
+exp(tidy(m4)$estimate[4])
+exp(tidy(m4)$std.error[4])
+exp(tidy(m4)$lower[4])
+exp(tidy(m4)$upper[4])
+
+
+#summary
+summary(m5)
+tidy(m5)
+
+
+```
+
+
+
+```{r}
+
+
+## plot marginal effects of the interaction in model 4(best model)
+marg = marginal_effects(m4)
+plot(marg, plot = FALSE) [[3]] +
+  theme_minimal() +
+  scale_color_grey() +
+  scale_fill_grey()
+
+
+```

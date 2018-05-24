@@ -1,0 +1,290 @@
+---
+title: "Sentiment analysis"
+author: "Sofie Frandsen and Helene Westergaard, with help from Josephine Hillebrand"
+date: "May 2, 2018"
+output: html_document
+---
+
+#Load in packages for our sentiment analysis.
+```{r}
+library(pacman)
+```
+
+
+```{r setup, include=FALSE}
+p_load(tesseract) #This is for reading in the non-machinereadable PDFs - you need to download the danish part of it if using it yourself - code inserted below this chunk
+
+#Run this line to get the danish stuff
+danish <- tesseract("dan")
+```
+
+This is the code for getting the Danish part
+
+**Run this** to get the danish stuff.
+tesseract_download("dan")
+danish <- tesseract("dan")
+
+
+```{r}
+
+#All this is commented out to save time - do you ever just run the entire code and regret it?
+#A2 <- ocr("P_A1_fly_Y2011.pdf", engine = danish)
+
+#Try with JP
+#A1 <- ocr("J_A1_fly_Y2013.pdf", engine = danish)
+
+#A3 <- ocr("b_A1_fly_Y2011.pdf", engine = danish)
+
+
+#write.csv(A1, "A1JP.txt")
+
+#write.csv(A2, "A1P.txt")
+
+#write.csv(A3, "A1B.txt")
+
+#A1 = ocr("testartikel.pdf", engine = danish)
+#write.csv(A1, "A1test.txt")
+```
+
+
+Try with machine readable stuff
+
+```{r}
+#Same reason for commenting out as above
+
+# p_load(tm)
+# p_load(pdftools)
+
+#text = pdf_text("p_A1_fly_Y2011.pdf")
+
+```
+
+
+Below, we make a function for cleaning the text (Thanks Arnault for the inspiration for code).
+```{r}
+
+p_load(stringr)
+
+
+
+cleanText <- function(string){
+  #Set temporary WD
+  setwd("C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Infomedia_before")
+  # Make the text lowercase
+  temp = tolower(string)
+  
+  #Now let us remove everything starting with a backslash _ Wuhuu, the code works now! :D
+  temp = stringr::str_replace_all(temp, "[[:cntrl:]]", " ")
+  
+  #Okay, now let us remove everything that is in the bottom infomedia-don't-share-this-article-thingy
+  temp = sub("alt materiale i infomedia.*", "", temp)
+  
+  #Okay, now it would be really cool if we could remove everything that starts with "https:" and ends with "infomedia" (everything in between this
+  temp = sub("https.*infomedia", "", temp)
+  
+  #Okay, next step - let us remove everything before "id:" ( and the thing in the space after the id)
+  #Best bet is to do like this (but might create issues if we have an article that include "id: " at some point, but we just can't do anything about this at the moment - assumption that this will be right
+  temp = sub(".*id: ",  "", temp)
+  
+    
+  #Okay, so now we just need to remove everything that is not letters or numbers.
+  #And unfortunately we cannot use Arnaults function and need to make our own
+  #I HATE DANISH!
+  #But the below works
+  temp = stringr::str_replace_all(temp, "\\W", " ") #\\W means all non-word characters - thus removes everything but letters and numbers
+  
+  #And now we need to remove every time we have double, triple or more spaces
+  #Shrink down to just one white space
+  temp <- stringr::str_replace_all(temp,"[\\s]+", " ")
+  
+  #okay, so now we need to remove the ID number. We now that the ID number is the first thinghy in our string. So now we split the string by space (which we needed to do at some point anyway, and then remove the first element)
+  temp = strsplit(temp, " ")[[1]]
+  #And now we remove the first thing in the streng
+  temp = temp[-1]
+
+  return(temp)
+}
+```
+
+And now we make a function for the sentiment analysis
+```{r}
+#We need to set WD, for some stupid reason
+setwd("C:/Users/slhf9/Dropbox/SocKult exam/Analysis")
+#RUN THIS LINE, hope it allows stupid danish letters
+
+#Had to convert the file into a csv, so now commented out
+#p_load(rio)
+#convert("afinn_en.txt", "afinn_en.csv")
+
+#Read in the Afinn library
+# afinn = read.csv("afinn.csv", header = F, encoding = "UTF-8")
+# 
+# afinn$V1 = as.character(afinn$V1)
+# 
+# #Okay, this works now, but fucks up the first word. Let us just change that quickly
+# afinn[1,1] = "abekat"
+# 
+# #remove first row
+# afinn = afinn[-1,]
+# 
+# #And then rename the column names
+# colnames(afinn)[1] <- "word"
+# colnames(afinn)[2] <- "sentiment"
+# 
+# afinn = read.csv("afinn.csv", header = F, encoding = "UTF-8")
+# afinn = afinn[-1,]
+# 
+# afinn$V1 = as.character(afinn$V1)
+# 
+# colnames(afinn_en)[1] <- "word"
+# colnames(afinn_en)[2] <- "sentiment"
+
+# tempDF = as.data.frame(cleanA)
+# colnames(tempDF) = "word"
+# tempDF$word = as.character(tempDF$word)
+# #Day
+# tempDF$day = regmatches(article, regexpr("[0-9][0-9][0-9][0-9]", article))
+# 
+# tempDF = dplyr::left_join(tempDF, afinn, by = "word")
+# 
+# tempDF$sentiment = as.numeric(as.character(tempDF$sentiment))
+# tempDF$arousal = abs(tempDF$sentiment)
+# tempDF$nWords = length(tempDF$word)
+# 
+# tempDF$nWordsSentiment = sum(complete.cases(tempDF$sentiment))
+# 
+# tempDF$percWordsSentiment = (sum(complete.cases(tempDF$sentiment))/length(tempDF$word))*100
+
+sentimentAnalysis <- function(string){
+  
+  #okay, we start out by making our article string into a temporary dataframe
+  tempDF = as.data.frame(string)
+  
+  #Now we change the name of one of our columns (the column for our words in the article is right now called string - that doesn't work!)
+  colnames(tempDF) <- "word"
+  
+  #We don't want the word column to be a factor. So we change it. #BE THE CHANGE YOU WANT TO SEE IN THE WORLD!
+  tempDF$word = as.character(tempDF$word)
+  
+  # information from our file name
+  #day
+  tempDF$day = regmatches(article, regexpr("[0-9][0-9][0-9][0-9]", article))
+  
+  #And now for sentiment!
+ 
+  #Okay, so we have the tempDF and the afinn df and now we merge them using what is apparently a left outer join
+  tempDF = dplyr::left_join(tempDF, afinn, by = "word")
+  
+  #Now add a column with arousal - Aka change sentiment to absolute values
+  tempDF$sentiment = as.numeric(as.character(tempDF$sentiment))
+  tempDF$arousal = abs(tempDF$sentiment)
+  
+  #Now at a row for number of words in the article
+  tempDF$nWords = length(tempDF$word)
+  
+  #Now for number of words that actually gave os a score
+  tempDF$nWordsSentiment = sum(complete.cases(tempDF$sentiment))
+  
+  #And let us just calculate the percentage...
+  tempDF$percWordsSentiment = (sum(complete.cases(tempDF$sentiment))/length(tempDF$word))*100
+  
+ return(tempDF)
+}
+
+
+```
+
+
+
+And now for the loop
+
+```{r}
+
+#Make a list of all the articles that are non-machinable (I have a folder - Because I'm cool!) (New word - yay! :D)
+
+nmArticles = list.files(path = "C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Infomedia_before")
+
+
+
+#We can opeeeeeen the loooop! (Sing this in the same melody as "I can shoow you the woooorld!")
+
+N = 1
+
+for (article in nmArticles){
+  print (article) # just to be able to follow the code, see that it is working and stuff
+  print (N)
+  N = N+1
+  
+  #Set temporary WD
+  setwd("C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Infomedia_before")
+  
+  #Okay, now we are ready to read in the article
+  A <- ocr(article, engine = danish)
+  
+  #Okay, so our awesome function from the tesserect package helped us read the non machinable text.
+  #However, we are now left with a character string. This is the same length as number of pages in the pdf - And we just want one long coherrent text
+  #Is there an easier way to do this? Unlist did not work...
+  AOut = NULL
+  for (page in A){
+    AOut = paste(AOut, page, article, sep ="")
+  }
+  
+  #So, the loop above solved our problem - now we have the coherrent string
+  #Cool. Now we want to clean the text
+  cleanA = cleanText(AOut)
+  
+  #okay, so now we can move onto the next step... OUR SENTIMENT ANALYSIS! 
+  
+  #Fucntion is done! Good job, rainbow coloured dragon!
+  dfAnalysis = sentimentAnalysis(cleanA)
+  
+  
+  #And now we just need to write this to a csv-file!
+  #EASY!
+  
+  #first we specify our name.
+  #AKA, remove .pdf and swap it for .csv in our article name
+  saveName = sub(".pdf", ".csv", article)
+  
+  #Set temporary WD again (but to a different place)
+  setwd("C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Analyzed files")
+  write.csv(dfAnalysis, file = saveName, row.names = F)
+  
+}
+
+
+
+```
+
+
+
+
+
+
+#Now we merge our  files to one file with an insane amount of rows
+```{r}
+N = 1
+
+#Get a list of all the csv files
+articles = list.files(path = "C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Analyzed files")
+
+for (article in articles){
+  
+  #set temporary wd
+  setwd("C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Analyzed files")
+  
+  A = read.csv(article)
+  
+  if (exists("sentiment") == F){
+    sentiment = A
+  }else {sentiment = rbind(sentiment, A)
+    print(c("RAINBOW UNICORN DRAGON", N))
+    N = N+1}
+  }
+
+#Now we save the big CSVfile
+write.csv(sentiment, file = "bigCSVOfSentiment.csv", row.names = F)
+
+```
+
+

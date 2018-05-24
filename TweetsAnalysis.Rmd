@@ -1,0 +1,323 @@
+---
+title: "Twitter mining and sentiment analysis"
+author: "Sofie Frandsen and Helene Westergaard with help from Adam Finnemann and Josephine Hillebrand"
+date: "May 5, 2018"
+---
+  
+  
+  
+```{r}
+library(pacman)
+p_load(tidyverse, tidytext, stringr, twitteR, magrittr, ggplot2, dplyr)
+
+
+#set working directory
+getwd()
+locpath = getwd()
+setwd(locpath)
+
+#read  twitter data
+da <- read.delim("da_tweets.csv", quote = "", sep = ";")
+da2 <- read.delim("da_tweets3.csv", quote = "", sep = ";")
+
+en0 = read.delim("en_tweets0.txt", quote = "", sep = "\t")
+en1 = read.delim("en_tweets1.txt", quote = "", sep = "\t")
+en2 = read.delim("en_tweets2.txt", quote = "", sep = "\t")
+en3 = read.delim("en_tweets3.txt", quote = "", sep = "\t")
+en4 = read.delim("en_tweets4.txt", quote = "", sep = "\t")
+en5 = read.delim("en_tweets5.txt", quote = "", sep = "\t")
+en6 = read.delim("en_tweets6.txt", quote = "", sep = "\t")
+en7 = read.delim("en_tweets7.txt", quote = "", sep = "\t")
+en8 = read.delim("en_tweets8.txt", quote = "", sep = "\t")
+en9 = read.delim("en_tweets9.txt", quote = "", sep = "\t")
+en10 = read.delim("en_tweets10.txt", quote = "", sep = "\t")
+en11 = read.delim("en_tweets11.txt", quote = "", sep = "\t")
+en12 = read.delim("en_tweets12.txt", quote = "", sep = "\t")
+en13 = read.delim("en_tweets13.txt", quote = "", sep = "\t")
+en14 = read.delim("en_tweets14.txt", quote = "", sep = "\t")
+en15 = read.delim("en_tweets15.txt", quote = "", sep = "\t")
+en16 = read.delim("en_tweets16.txt", quote = "", sep = "\t")
+en17 = read.delim("en_tweets17.txt", quote = "", sep = "\t")
+en18 = read.delim("en_tweets18.txt", quote = "", sep = "\t")
+en19 = read.delim("en_tweets19.txt", quote = "", sep = "\t")
+en20 = read.delim("en_tweets20.txt", quote = "", sep = "\t")
+en21 = read.delim("en_tweets21.txt", quote = "", sep = "\t")
+en22 = read.delim("en_tweets22.txt", quote = "", sep = "\t")
+en23 = read.delim("en_tweets23.txt", quote = "", sep = "\t")
+en24 = read.delim("en_tweets24.txt", quote = "", sep = "\t")
+en25 = read.delim("en_tweets25.txt", quote = "", sep = "\t")
+en26 = read.delim("en_tweets26.txt", quote = "", sep = "\t")
+en27 = read.delim("en_tweets27.txt", quote = "", sep = "\t")
+en28 = read.delim("en_tweets28.txt", quote = "", sep = "\t")
+en29 = read.delim("en_tweets29.txt", quote = "", sep = "\t")
+en30 = read.delim("en_tweets30.txt", quote = "", sep = "\t")
+en31 = read.delim("en_tweets31.txt", quote = "", sep = "\t")
+en32 = read.delim("en_tweets32.txt", quote = "", sep = "\t")
+
+#remove empty x-columns
+en1$X = NULL
+en2$X = NULL
+en2$X.1 = NULL
+en3$X = NULL
+en3$X.1 = NULL
+en3$X.2 = NULL
+en4$X = NULL
+en4$X.1 = NULL
+en5$X = NULL
+en6$X = NULL
+en7$X = NULL
+en8$X = NULL
+en9$X = NULL
+en10$X = NULL
+en11$X = NULL
+en12$X = NULL
+en13$X = NULL
+en14$X = NULL
+en14$X.1 = NULL
+en14$X.2 =NULL
+en15$X = NULL
+en16$X = NULL
+en16$X.1 = NULL
+en17$X =NULL
+en18$X = NULL
+en19$X = NULL
+en20$X = NULL
+en21$X = NULL
+en22$X = NULL
+en23$X = NULL
+en24$X = NULL
+en24$X.1 = NULL
+en25$X = NULL
+en26$X = NULL
+en27$X = NULL
+en28$X = NULL
+en28$X.1 = NULL
+en29$X = NULL
+en30$X = NULL
+en30$X.1 = NULL
+en31$X = NULL
+en32$X = NULL
+
+#rename the weird columns
+colnames(en1)[1] = "username"
+colnames(en4)[1] = "username"
+colnames(en5)[1] = "username"
+colnames(en6)[1] = "username"
+colnames(en7)[1] = "username"
+colnames(en8)[1] = "username"
+colnames(en9)[1] = "username"
+colnames(en10)[1] = "username"
+colnames(en11)[1] = "username"
+colnames(en12)[1] = "username"
+colnames(en14)[1] = "username"
+colnames(en15)[1] = "username"
+colnames(en16)[1] = "username"
+colnames(en17)[1] = "username"
+colnames(en18)[1] = "username"
+colnames(en19)[1] = "username"
+colnames(en2)[1] = "username"
+colnames(en20)[1] = "username"
+colnames(en21)[1] = "username"
+colnames(en22)[1] = "username"
+colnames(en23)[1] = "username"
+colnames(en24)[1] = "username"
+colnames(en25)[1] = "username"
+colnames(en26)[1] = "username"
+colnames(en27)[1] = "username"
+colnames(en28)[1] = "username"
+colnames(en29)[1] = "username"
+colnames(en3)[1] = "username"
+colnames(en30)[1] = "username"
+colnames(en31)[1] = "username"
+colnames(en32)[1] = "username"
+
+#combine the dfs
+ent = rbind(en0, en1, en2, en3, en4, en5, en6, en7, en8, en9, en10, en11, en12, en13, en14, en15, en16, en17, en18, en19, en20, en21, en22, en23, en24, en25, en26, en27, en28, en29, en30, en31, en32)
+
+
+#convert dates to R-readable dates
+da2$date = as.character(da2$date)
+da2$date = as.Date(da2$date)
+
+#the dates from these df have a different format
+da$date = as.character(da$date)
+da$date = as.Date(da$date, format = "%d-%m-%Y")
+ent$date = as.character(ent$date)
+ent$date = as.Date(ent$date, format = "%d-%m-%Y")
+
+#combine the dfs
+dat = rbind(da2, da)
+
+#remove duplicated tweets, by checking the text and username
+dat = dplyr::distinct(dat, text, username, .keep_all = TRUE)
+ent = dplyr::distinct(ent, text, username, .keep_all = TRUE)
+
+#remove tweets from oct 14 and nov 16
+ent = ent[!(ent$date == "2017-10-14"),]
+ent = ent[!(ent$date == "2017-11-16"),]
+dat = dat[!(dat$date == "2017-10-14"),]
+dat = dat[!(dat$date == "2017-11-16"),]
+
+#write one big txt file 
+write.table(ent, file = "en_tweets_all.txt", col.names = T)
+
+ent2 = ent
+
+```
+
+
+#cleaning the tweets
+
+```{r}
+
+reg_words <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
+
+tidy_dat <- dat %>%
+  filter(!str_detect(text, "^RT")) %>% #filtering out tweets starting with RT: retweets
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https", "")) %>% #removes homepage adresses and unecessary stuff
+  mutate(text = str_replace_all(text, "http://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|http", "")) %>% #removes homepage adresses and unecessary stuff
+  unnest_tokens(word, text, token = "regex", pattern = reg_words) %>% #removes unnests text document
+  filter(!word %in% stop_words$word, #removes stop words
+         str_detect(word, "[a-z]"),
+         substr(word, 1, 1) != '#', # omit hashtags
+         substr(word, 1, 1) != '@' # omit Twitter handles) #lower cases 
+  )
+
+tidy_ent <- ent %>%
+  filter(!str_detect(text, "^RT")) %>% #filtering out tweets starting with RT: retweets
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https", "")) %>% #removes homepage adresses and unecessary stuff
+  mutate(text = str_replace_all(text, "http://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|http", "")) %>% #removes homepage adresses and unecessary stuff
+  unnest_tokens(word, text, token = "regex", pattern = reg_words) %>% #removes unnests text document
+  filter(!word %in% stop_words$word, #removes stop words
+         str_detect(word, "[a-z]"),
+         substr(word, 1, 1) != '#', # omit hashtags
+         substr(word, 1, 1) != '@' # omit Twitter handles) #lower cases 
+  )
+
+
+
+```
+
+```{r}
+#subset the columns we need 
+dat_sub = subset(tidy_dat, select = c(word, username, date, retweets))
+ent_sub = subset(tidy_ent, select = c(word, username, date, retweets))
+```
+
+
+```{r}
+#sentiment analysis function from Josephine
+TsentimentAnalysis <- function(df){
+  
+  tempDF = df
+ 
+  #Okay, so we have the tempDF and the afinn df and now we merge them using what is apparently a left outer join
+  tempDF = dplyr::left_join(tempDF, afinn, by = "word")
+  
+  #Now add a column with arousal - Aka change sentiment to absolute values
+  tempDF$sentiment = as.numeric(as.character(tempDF$sentiment))
+  tempDF$arousal = abs(tempDF$sentiment)
+  
+  #Now add a row for number of words in the article
+  tempDF$nWords = length(tempDF$word)
+  
+  #Now for number of words that actually gave os a score
+  tempDF$nWordsSentiment = sum(complete.cases(tempDF$sentiment))
+  
+  #And let us just calculate the percentage...
+  tempDF$percWordsSentiment = (sum(complete.cases(tempDF$sentiment))/length(tempDF$word))*100
+  
+ return(tempDF)
+}
+
+enTsentimentAnalysis <- function(df){
+  
+  tempDF = df
+ 
+  #Okay, so we have the tempDF and the afinn df and now we merge them using what is apparently a left outer join
+  tempDF = dplyr::left_join(tempDF, afinn_en, by = "word")
+  
+  #Now add a column with arousal - Aka change sentiment to absolute values
+  tempDF$sentiment = as.numeric(as.character(tempDF$sentiment))
+  tempDF$arousal = abs(tempDF$sentiment)
+  
+  #Now add a row for number of words in the article
+  tempDF$nWords = length(tempDF$word)
+  
+  #Now for number of words that actually gave os a score
+  tempDF$nWordsSentiment = sum(complete.cases(tempDF$sentiment))
+  
+  #And let us just calculate the percentage...
+  tempDF$percWordsSentiment = (sum(complete.cases(tempDF$sentiment))/length(tempDF$word))*100
+  
+ return(tempDF)
+}
+```
+
+```{r}
+#do sentiment analysis on tweets
+dat_sent = TsentimentAnalysis(dat_sub)
+ent_sent = enTsentimentAnalysis(ent_sub)
+```
+
+
+```{r}
+
+
+#create df with mean of sentiment and arousal per day
+dat_df = aggregate(dat_sent[, 5:6], list(dat_sent$date), FUN = mean, na.rm = TRUE)
+news_df = aggregate(news_sent[, 3:4], list(news_sent$date), FUN = mean, na.rm = TRUE)
+ent_df = aggregate(ent_sent[, 5:6], list(ent_sent$date), FUN = mean, na.rm = TRUE)
+
+#rename date column
+colnames(dat_df)[1] <- "date"
+colnames(news_df)[1] = "date"
+colnames(ent_df)[1] = "date"
+
+#add row to dat df for Oct 15 (no tweets so no row)
+x = c("2017-10-15", NA, NA)
+dat_df = rbind(x, dat_df)
+dat_df$sentiment = as.numeric(dat_df$sentiment)
+dat_df$arousal = as.numeric(dat_df$arousal)
+
+#create column with number of days after the hashtag started
+dat_df$days_after = 0:31
+news_df$days_after = 0:31
+ent_df$days_after = 0:31
+
+#create column with no. of tweets pr day in dat df to use in dat_df
+p_load(data.table)
+setDT(dat)[, frequency:=.N, by=date]
+setDT(ent)[, frequency:=.N, by=date]
+
+#get frequency column into dat_df (can use mean because math)
+frequency = aggregate(dat$frequency, list(dat$date), FUN = mean)
+colnames(frequency)[1] = "date"
+colnames(frequency)[2] = "frequency"
+
+frequency_en = aggregate(ent$frequency, list(ent$date), FUN = mean)
+colnames(frequency_en)[1] = "date"
+colnames(frequency_en)[2] = "frequency"
+
+y = c("2017-10-15", 0) #need to add row for Oct 15
+frequency = rbind(y, frequency)
+dat_df$frequency = frequency$frequency
+
+ent_df$frequency = frequency_en$frequency
+
+#make frequency column numeric in dat df
+dat_df$frequency = as.numeric(dat_df$frequency)
+
+#create column woth no. of news pr day (counted manually)
+news_df$frequency = (c(14, 5, 16, 17, 17, 18, 21, 17, 8, 6, 4, 14, 22, 14, 14, 5, 7, 8, 7, 25, 17, 10, 8, 6, 8, 14, 12, 15, 10, 22, 19, 15))
+
+
+
+
+```
+
+```{r}
+setwd("C:/Users/slhf9/Dropbox/SocKult exam/Analysis/Analyzed files")
+news = read.csv("bigCSVOfSentiment.csv")
+```
+
