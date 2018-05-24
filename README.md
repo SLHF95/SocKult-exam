@@ -1,0 +1,1 @@
+# SocKult-exam
